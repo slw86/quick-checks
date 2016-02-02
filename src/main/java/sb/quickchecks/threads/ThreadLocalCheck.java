@@ -67,7 +67,7 @@ public class ThreadLocalCheck {
 
     public static void main(String[] args) {
 
-        StateSharable sharedState = new SharedState2();
+        StateSharable sharedState = new SharedState2(); //new SharedState();
 
         Thread thread1 = new Thread(new MyRunnable(sharedState), "Thread_1");
         Thread thread2 = new Thread(new MyRunnable(sharedState), "Thread_2");
