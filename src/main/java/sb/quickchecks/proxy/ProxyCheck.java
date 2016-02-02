@@ -19,7 +19,7 @@ public class ProxyCheck {
         public void doSmth();
     }
     
-    static class ProxyCheckHandler implements InvocationHandler {
+    private static class ProxyCheckHandler implements InvocationHandler {
         
         private SampleInterface original;
 
