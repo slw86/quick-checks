@@ -11,6 +11,9 @@ public class Car implements Cloneable{
     private String model;
     private int maxSpeed;
     private Engine engine;
+    
+    public Car() {
+    }
 
     public Car(String brand, String model, int maxSpeed, Engine engine) {
         this.brand = brand;
