@@ -1,14 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package sb.quickchecks.cloning.model;
 
-/**
- *
- * @author slwk
- */
 public class Truck extends Car {
     
     private int payload;
@@ -27,9 +18,9 @@ public class Truck extends Car {
 
     @Override
     public Truck clone() {
-        
-//        Truck truckClone = new Truck(getBrand(), getModel(), getMaxSpeed(), engineClone);
-        Truck truckClone = (Truck)super.clone();
+        Engine engineClone = getEngine().clone();
+        Truck truckClone = new Truck(getBrand(), getModel(), getMaxSpeed(), engineClone);
+//        Truck truckClone = (Truck)super.clone();
         return truckClone;
     }
 }
