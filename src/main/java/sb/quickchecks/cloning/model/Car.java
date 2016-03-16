@@ -1,6 +1,6 @@
 package sb.quickchecks.cloning.model;
 
-public class Car {//implements Cloneable {
+public class Car { //implements Cloneable {
 
     private String brand;
     private String model;
@@ -38,7 +38,9 @@ public class Car {//implements Cloneable {
     @Override
     public Car clone() {
         try {
-            return (Car) super.clone();
+            Car clone = (Car) super.clone();
+            clone.engine = this.engine.clone();
+            return clone;
         } catch (CloneNotSupportedException ex) {
             throw new RuntimeException("Unable to clone " + ex);
         }

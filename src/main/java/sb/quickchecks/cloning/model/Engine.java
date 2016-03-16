@@ -5,7 +5,7 @@ import java.util.UUID;
 public class Engine implements Cloneable {
     
     private int horsePower;
-    private final String uniqueID = UUID.randomUUID().toString();
+//    private final String uniqueID = UUID.randomUUID().toString();
 
     public Engine(int horsePower) {
         this.horsePower = horsePower;
@@ -21,7 +21,7 @@ public class Engine implements Cloneable {
 
     @Override
     public String toString() {
-        return "Engine{ horsePower=" + horsePower + ", uniqueID="+uniqueID+" }";
+        return "Engine{ horsePower=" + horsePower + "}"; //, uniqueID="+uniqueID+" }";
     }
 
     @Override
