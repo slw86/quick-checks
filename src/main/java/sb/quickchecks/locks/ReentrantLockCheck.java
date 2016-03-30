@@ -2,40 +2,33 @@ package sb.quickchecks.locks;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sb.quickchecks.locks.util.RandomQuoteRetriever;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Created by slwk on 20.03.16.
  */
 public class ReentrantLockCheck {
 
-    public static final int SLEEP_TIME = 2000;
-    private ReentrantLock lock = new ReentrantLock();
+    public static final int SLEEP_TIME = 2000; //2000; //30000 for interruptibitility check
+    //    private ReentrantLock lock = new ReentrantLock();
+    private ReentrantLock lock = new ReentrantLock(true);
     private static final Logger LOGGER = LoggerFactory.getLogger(ReentrantLockCheck.class);
-    private static final Pattern PATTERN = Pattern.compile("(.*)(joke\":)(\\s*\")(.*)(\",.*)");
-    private static final Random RANDOM = new Random();
-//    private static final Map<String, AtomicInteger> STATISTICS = new ConcurrentHashMap<>();
-private static final Map<String, Integer> STATISTICS = new ConcurrentHashMap<>();
-    private static final int NUM_OF_THREADS = 10;
-    private static final CountDownLatch LATCH = new CountDownLatch(NUM_OF_THREADS);
+    private static final int NUM_OF_THREADS = 10; //2; //2 - for fainrness/non fairness
+    private CountDownLatch latch = new CountDownLatch(NUM_OF_THREADS);
+    private RandomQuoteRetriever randomQuoteRetriever = new RandomQuoteRetriever(latch);
 
     public void doSomethingOnSharedResourceUsingReentrantLock() {
         lock.lock();
         try {
-            LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
+            //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
             doSomethingImportant();
         } catch (InterruptedException e) {
             LOGGER.error("{}",e);
@@ -44,6 +37,53 @@ private static final Map<String, Integer> STATISTICS = new ConcurrentHashMap<>()
             lock.unlock();
         }
     }
+
+    public void doSomethingOnSharedResourceUsingReentrantLockAndUnlockSomwhere() {
+        lock.lock();
+        try {
+            //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
+            doSomethingImportant();
+        } catch (InterruptedException e) {
+            LOGGER.error("{}",e);
+        }
+    }
+
+    public void doSomethingOnSharedResourceUsingReentrantInterruptibleLock() {
+        try {
+            lock.lockInterruptibly();
+        } catch (InterruptedException e) {
+            LOGGER.error("Lock interrupted in thread {}! returning...",Thread.currentThread().getName(),e);
+            return;
+        }
+        try {
+            //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
+            doSomethingImportant();
+        } catch (InterruptedException e) {
+            LOGGER.error("{}",e);
+            return;
+        } finally {
+            LOGGER.debug("Lock unlocked");
+            lock.unlock();
+        }
+    }
+
+    public void doSomethingOnSharedResourceUsingReentrantLockWithoutFinally() {
+        lock.lock();
+        try {
+            //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
+            doSomethingImportant();
+            Random rand = new Random();
+            if(rand.nextInt(NUM_OF_THREADS) == 3) {
+                LOGGER.debug("Throwning exception");
+                throw new RuntimeException("Something is broken... said "+Thread.currentThread().getName());
+            }
+        } catch (InterruptedException e) {
+            LOGGER.error("{}",e);
+        }
+        LOGGER.debug("Lock unlocked");
+        lock.unlock();
+    }
+
 
     public boolean tryToDoSomethingOnSharedResourceUsingReentrantLock(CountDownLatch countDownLatch) {
         if(lock.tryLock()) {
@@ -94,126 +134,147 @@ private static final Map<String, Integer> STATISTICS = new ConcurrentHashMap<>()
     }
 
     private void doSomethingImportant() throws InterruptedException {
-        LOGGER.debug("<<<<<< Thread {} is working on shared resource.",Thread.currentThread().getName());
-//        LOGGER.debug("sleeping...");
-        Thread.sleep(SLEEP_TIME);
-        LOGGER.debug(">>>>>> Thread {} completed its work", Thread.currentThread().getName());
+        try {
+            LOGGER.debug("<<<<<< Thread {} is working on shared resource.", Thread.currentThread().getName());
+            Thread.sleep(SLEEP_TIME);
+            LOGGER.debug(">>>>>> Thread {} completed its work", Thread.currentThread().getName());
+        }
+        finally {
+//            LOGGER.debug("Lock unlocked");
+//            lock.unlock();
+//            countDownLatch.countDown();
+        }
     }
 
-    private static Runnable getRunnable(Consumer<ReentrantLockCheck> lockCheckConsumer, ReentrantLockCheck reentrantLockCheck) {
+
+    public static void main(String[] args) throws InterruptedException {
+
+
+
+        ReentrantLockCheck reentrantLockCheck = new ReentrantLockCheck();
+
+            ExecutorService executorService = getExecutorServiceAndSubmitTasks(reentrantLockCheck);
+
+//            feedByThreads(reentrantLockCheck, executorService);
+
+            executorService.shutdown();
+
+            reentrantLockCheck.randomQuoteRetriever.printStatistics();
+
+
+
+
+
+        //interruptible:
+/*
+//        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingIntrinsicLock(), reentrantLockCheck);
+//        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingReentrantLock(), reentrantLockCheck);
+        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingReentrantInterruptibleLock(), reentrantLockCheck);
+
+        Thread t1 = new Thread(runnable);
+        Thread t2 = new Thread(runnable);
+        Thread t3 = new Thread(runnable);
+
+        t1.start();
+        t2.start();
+        t3.start();
+
+        Thread.sleep(2000);
+
+        LOGGER.debug("T1 state: {}", t1.getState().name());
+        LOGGER.debug("T2 state: {}", t2.getState().name());
+        LOGGER.debug("T3 state: {}", t3.getState().name());
+
+        //for intrinsic
+//        if(t1.getState() == Thread.State.BLOCKED) {
+//            t1.interrupt();
+//            LOGGER.debug("INterrupted t1");
+//        } else if(t2.getState() == Thread.State.BLOCKED) {
+//            t2.interrupt();
+//            LOGGER.debug("INterrupted t2");
+//        }
+
+        //for reentrant
+        if(t1.getState() == Thread.State.WAITING) {
+            t1.interrupt();
+            LOGGER.debug("INterrupted t1");
+        } else if(t2.getState() == Thread.State.WAITING) {
+            t2.interrupt();
+            LOGGER.debug("INterrupted t1");
+        }
+
+        //for reentrant
+//        if(t1.getState() == Thread.State.TIMED_WAITING) {
+//            t1.interrupt();
+//            LOGGER.debug("INterrupted t1");
+//        } else if(t2.getState() == Thread.State.TIMED_WAITING) {
+//            t2.interrupt();
+//            LOGGER.debug("INterrupted t1");
+//        }
+*/
+    }
+
+    private static void feedByThreads(ReentrantLockCheck reentrantLockCheck, ExecutorService executorService) throws InterruptedException {
+        Thread.sleep(SLEEP_TIME+10);
+
+        for(int i = 0; i < 20; i++) {
+            executorService.submit(decorateRunnable(() -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock()));
+            Thread.sleep(2);
+        }
+    }
+
+    private static Runnable decorateRunnable(Runnable runnable) {
         return () -> {
             LOGGER.debug("Thread {} attempting to do something on shared resource",Thread.currentThread().getName());
-            lockCheckConsumer.accept(reentrantLockCheck);
-            LOGGER.debug("Thread {} completed its action", Thread.currentThread().getName());
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+//            LOGGER.debug("Thread {} completed its action", Thread.currentThread().getName());
         };
     }
 
 
-
-    public static void main(String[] args) {
-
-        ReentrantLockCheck reentrantLockCheck = new ReentrantLockCheck();
-
-
-        ExecutorService executorService = getExecutorServiceAndSubmitTasks(reentrantLockCheck);
-
-        executorService.shutdown();
-
-
-        printStatistics();
-
-    }
-
-    private static void printStatistics() {
-        try {
-            LATCH.await();
-        } catch (InterruptedException e) {
-            LOGGER.error("{}",e);
-        }
-        STATISTICS.forEach((k,v) -> LOGGER.debug("Thread: {} told joke: {} times",k,v));
-    }
-
-    private static ExecutorService getExecutorServiceAndSubmitTasks(ReentrantLockCheck reentrantLockCheck) {
-        ExecutorService executorService = Executors.newFixedThreadPool(NUM_OF_THREADS);
+    private static ExecutorService getExecutorServiceAndSubmitTasks(final ReentrantLockCheck reentrantLockCheck) {
+        ExecutorService executorService = Executors.newFixedThreadPool(NUM_OF_THREADS+20);
         for(int i = 0; i <NUM_OF_THREADS; i++) {
-            executorService.submit(getRunnable((r) ->
-//                    {
-//                        while (!r.tryToDoSomethingOnSharedResourceUsingReentrantLock()) {
-////                            LOGGER.debug("Thread {} is waiting for resource. Let's do something useful...", Thread.currentThread().getName());
-//                            printRandomQuote();
-//                        }
-//                    }
+
+            executorService.submit(decorateRunnable(() ->
                     {
-                        try {
-                            while (!r.tryToDoSomethingOnSharedResourceUsingTimedReentrantLock(LATCH)) {
-                                printRandomQuote();
-                            }
-                        } catch (InterruptedException e) {
-                            LOGGER.error("{}",e);
+                        while (!reentrantLockCheck.tryToDoSomethingOnSharedResourceUsingReentrantLock(reentrantLockCheck.latch)) {
+//                            LOGGER.debug("Thread {} is waiting for resource. Let's do something useful...", Thread.currentThread().getName());
+                           reentrantLockCheck.randomQuoteRetriever.printRandomQuote();
                         }
                     }
+//                    {
+//                        try {
+//                            while (!reentrantLockCheck.tryToDoSomethingOnSharedResourceUsingTimedReentrantLock(reentrantLockCheck.latch)) {
+//                                reentrantLockCheck.randomQuoteRetriever.printRandomQuote();
+//                            }
+//                        } catch (InterruptedException e) {
+//                            LOGGER.error("{}",e);
+//                        }
+//                    }
+//                    {
+//                        reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock();
+//                    }
 //            {
-//                r.doSomethingOnSharedResourceUsingReentrantLock();
+//                reentrantLockCheck.doSomethingOnSharedResourceUsingIntrinsicLock();
 //            }
 //            {
-//                r.doSomethingOnSharedResourceUsingIntrinsicLock();
+//                reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockWithoutFinally();
 //            }
-                    , reentrantLockCheck));
+//            {
+//                reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockAndUnlockSomwhere();
+//            }
+                    ));
         }
         return executorService;
     }
 
-    private static void printRandomQuote() {
 
-//        int count = STATISTICS.get(Thread.currentThread().getName());
-//        STATISTICS.putIfAbsent(Thread.currentThread().getName(),count++);
 
-//        STATISTICS.putIfAbsent(Thread.currentThread().getName(), new AtomicInteger(0));
-        STATISTICS.putIfAbsent(Thread.currentThread().getName(), 0);
-//        LOGGER.debug("Thread {} INTEGER = {}",Thread.currentThread().getName(),integer);
-
-        int val = STATISTICS.get(Thread.currentThread().getName());
-//        val.incrementAndGet();
-
-        STATISTICS.put(Thread.currentThread().getName(),++val);
-        LOGGER.debug("{} = {}",Thread.currentThread().getName(),val);
-
-//        int x = STATISTICS.computeIfPresent(Thread.currentThread().getName(), (k,v) -> v+1);
-//        LOGGER.debug("Thread {} x = {}",Thread.currentThread().getName(),x);
-//        LOGGER.debug("Number of jokes for thread {} is {}",Thread.currentThread().getName(),STATISTICS.get(Thread.currentThread().getName()));
-
-        try {
-            URL url = new URL("http://api.icndb.com/jokes/random");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Accept", "application/json");
-
-            if (conn.getResponseCode() != 200) {
-                throw new RuntimeException("Failed : HTTP error code : "
-                        + conn.getResponseCode());
-            }
-
-            BufferedReader br = new BufferedReader(new InputStreamReader(
-                    (conn.getInputStream())));
-
-            String output;
-
-            while ((output = br.readLine()) != null) {
-                LOGGER.debug("Thread {}, tells joke: {}",Thread.currentThread().getName(),extractJokeString(output));
-                Thread.sleep(500+RANDOM.nextInt(1000));
-            }
-
-            conn.disconnect();
-        } catch (IOException e) {
-            LOGGER.error("{}",e);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static String extractJokeString(String input) {
-        Matcher matcher = PATTERN.matcher(input);
-        LOGGER.trace("mathces {}",matcher.matches());
-        return matcher.group(4);
-    }
 }
+
+
