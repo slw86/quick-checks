@@ -22,6 +22,7 @@ public class RandomQuoteRetriever {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RandomQuoteRetriever.class);
     private static final Pattern PATTERN = Pattern.compile("(.*)(joke\":)(\\s*\")(.*)(\",.*)");
+    public static final String URL = "http://api.icndb.com/jokes/random";
 
     private final Random RANDOM = new Random();
     private final Map<String, Integer> STATISTICS = new ConcurrentHashMap<>();
@@ -43,7 +44,7 @@ public class RandomQuoteRetriever {
         int x = STATISTICS.computeIfPresent(Thread.currentThread().getName(), (k,v) -> ++v);
 
         try {
-            URL url = new URL("http://api.icndb.com/jokes/random");
+            URL url = new URL(URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
@@ -59,7 +60,7 @@ public class RandomQuoteRetriever {
             String output;
 
             while ((output = br.readLine()) != null) {
-                LOGGER.debug("Thread {}, tells joke: {}",Thread.currentThread().getName(),extractJokeString(output));
+                LOGGER.debug("Thread {}, tells a joke: {}",Thread.currentThread().getName(),extractJokeString(output));
                 Thread.sleep(500+RANDOM.nextInt(1000));
             }
 

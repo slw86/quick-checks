@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Predicate;
 
 /**
  * Created by sbalcerek on 2016-03-30.
@@ -18,19 +17,20 @@ public class ReentrantLockCheckRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReentrantLockCheckRunner.class);
 
-    private static final int NUM_OF_THREADS = 10; //2; //2 - for fainrness/non fairness
-
-
+    private static final int NUM_OF_THREADS = 2; //2 - for fairness/non fairness (ex 10/11)
+    private static final long SLEEP_TIME = 2000; //20000 for interruption check (ex 7/8/9)
+    private static final boolean IS_LOCK_FAIR = true; //true for fairness/non check
+    private static final int ADDITIONAL_THREAD_POOL_SIZE = 100; //0 for ex. 1-9, 100 for ex. 10-11
+    private static final int EXAMPLE_NO_TO_RUN = 11; //1-11;
 
 
     public static void main(String[] args) throws InterruptedException {
 
-
         CountDownLatch latch = new CountDownLatch(NUM_OF_THREADS);
         RandomQuoteRetriever randomQuoteRetriever = new RandomQuoteRetriever(latch);
-        ReentrantLockCheck reentrantLockCheck = new ReentrantLockCheck(NUM_OF_THREADS, false);
+        ReentrantLockCheck reentrantLockCheck = new ReentrantLockCheck(NUM_OF_THREADS, SLEEP_TIME, IS_LOCK_FAIR);
 
-        Runnable unlockElswhere = () -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockAndUnlockSomwhere();
+        Runnable unlockElsewhere = () -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockAndUnlockElsewhere();
         Runnable unlockWithoutFinally = () -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockWithoutFinally();
         Runnable useIntrinsicLock = () -> reentrantLockCheck.doSomethingOnSharedResourceUsingIntrinsicLock();
         Runnable useReentrantLock = () -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock();
@@ -40,28 +40,93 @@ public class ReentrantLockCheckRunner {
                 randomQuoteRetriever.printRandomQuote();
             }
         };
+        Runnable tryAcquireReentrantLockWaitingSomeTime = () -> {
+            while (!reentrantLockCheck.tryToDoSomethingOnSharedResourceUsingReentrantLock(latch)) {
+                randomQuoteRetriever.printRandomQuote();
+            }
+        };
 
+        switch(EXAMPLE_NO_TO_RUN) {
+            case 1: {
+                //example 1. - using intrinsic lock:
+                runExample(useIntrinsicLock);
+                break;
+            }
+            case 2: {
+                //example 2. - use reentrant lock:
+                runExample(useReentrantLock);
+                break;
+            }
+            case 3: {
+                //example 3. - unlock reentrant lock in different method
+                runExample(unlockElsewhere);
+                break;
+            }
+            case 4: {
+                //example 4. - unlock reentrant lock without finally - ticking bomb
+                runExample(unlockWithoutFinally);
+                break;
+            }
+            case 5: {
+                //example 5. - try to acquire lock and if not success do something different
+                runExample(tryAcquireReentrantLock);
+                randomQuoteRetriever.printStatistics();
+                break;
+            }
+            case 6: {
+                //example 6. - try to acquire lock waiting at most some time and if not success do something different
+                runExample(tryAcquireReentrantLockWaitingSomeTime);
+                randomQuoteRetriever.printStatistics();
+                break;
+            }
+            case 7: {
+                //example 7. - interrupt thread blocked on intrinsic lock
+                interruptThreadBlockedOnLock(useIntrinsicLock, Thread.State.BLOCKED);
+                break;
+            }
+            case 8: {
+                //example 8. - interrupt thread blocked on reentrant lock
+                interruptThreadBlockedOnLock(useReentrantLock, Thread.State.WAITING);
+                break;
+            }
+            case 9: {
+                //example 9. - interrupt thread blocked on interruptible reentrant lock
+                interruptThreadBlockedOnLock(useInterruptibleLock, Thread.State.WAITING);
+                break;
+            }
+            case 10: {
+                //example 10. - non fair lock
+                runExampleForFairnessCheck(useReentrantLock);
+                break;
+            }
+            case 11: {
+                //example 11. - fair lock
+                runExampleForFairnessCheck(useReentrantLock);
+                break;
+            }
+        }
 
+    }
 
+    private static void runExample(Runnable runIt) {
+        ExecutorService executorService = getExecutorServiceAndSubmitTasks(runIt);
+        executorService.shutdown();
+    }
 
-//        ExecutorService executorService = getExecutorServiceAndSubmitTasks(useReentrantLock);
-//
-////            feedByThreads(reentrantLockCheck, executorService);
-//
-//        executorService.shutdown();
+    private static void runExampleForFairnessCheck(Runnable runIt) throws InterruptedException {
+        ExecutorService executorService = getExecutorServiceAndSubmitTasks(runIt);
 
-//        randomQuoteRetriever.printStatistics();
+        Thread.sleep(SLEEP_TIME+5);
 
+        for(int i = 0; i < ADDITIONAL_THREAD_POOL_SIZE; i++) {
+            executorService.submit(decorateRunnable(runIt));
+            Thread.sleep(1);
+        }
 
+        executorService.shutdown();
+    }
 
-
-
-        //interruptible:
-
-//        Runnable runnable = decorateRunnable(useIntrinsicLock);
-//        Runnable runnable = decorateRunnable(useReentrantLock);
-//        Runnable runnable = decorateRunnable(useInterruptibleLock);
-
+    private static void interruptThreadBlockedOnLock(Runnable useIntrinsicLock, Thread.State stateWhenInterrupt) throws InterruptedException {
         List<Thread> threads = createThreads(useIntrinsicLock);
         threads.stream().forEach((t) -> t.start());
 
@@ -69,55 +134,10 @@ public class ReentrantLockCheckRunner {
 
         threads.stream().forEach((t) -> LOGGER.debug("{} state: {}", t.getName(), t.getState().name()));
 
-        //for intrinsic
-//        if(threads.get(0).getState() == Thread.State.BLOCKED) {
-//            threads.get(0).interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        } else if(threads.get(1).getState() == Thread.State.BLOCKED) {
-//            threads.get(1).interrupt();
-//            LOGGER.debug("INterrupted t2");
-//        }
-
-//        Thread blockedThread = threads.stream().filter((t) -> t.getState() == Thread.State.BLOCKED).findFirst().get();
-//        blockedThread.interrupt();
-//        LOGGER.debug("Interrupted {}",blockedThread.getName());
-
-        //for reentrant
-//        if(threads.get(0).getState() == Thread.State.WAITING) {
-//            threads.get(0).interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        } else if(threads.get(1).getState() == Thread.State.WAITING) {
-//            threads.get(1).interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        }
-
-//        Thread waitingThread = threads.stream().filter((t) -> t.getState() == Thread.State.WAITING).findFirst().get();
-//        waitingThread.interrupt();
-//        LOGGER.debug("Interrupted {}",waitingThread.getName());
-
-
-        //for reentrant
-//        if(threads.get(0).getState() == Thread.State.TIMED_WAITING) {
-//            threads.get(0).interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        } else if(threads.get(1).getState() == Thread.State.TIMED_WAITING) {
-//            threads.get(1).interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        }
-
-//        Thread timedWaitingThread = threads.stream().filter((t) -> t.getState() == Thread.State.TIMED_WAITING).findFirst().get();
-//        timedWaitingThread.interrupt();
-//        LOGGER.debug("Interrupted {}",timedWaitingThread.getName());
+        Thread blockedThread = threads.stream().filter((t) -> t.getState() == stateWhenInterrupt).findFirst().get();
+        blockedThread.interrupt();
+        LOGGER.debug("Interrupted {}",blockedThread.getName());
     }
-
-//    private static void feedByThreads(ReentrantLockCheck reentrantLockCheck, ExecutorService executorService) throws InterruptedException {
-//        Thread.sleep(SLEEP_TIME+10);
-//
-//        for(int i = 0; i < 20; i++) {
-//            executorService.submit(decorateRunnable(() -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock()));
-//            Thread.sleep(2);
-//        }
-//    }
 
 
     private static List<Thread> createThreads(Runnable runnable) {
@@ -137,13 +157,13 @@ public class ReentrantLockCheckRunner {
         };
     }
 
-
     private static ExecutorService getExecutorServiceAndSubmitTasks(Runnable runnable) {
-        ExecutorService executorService = Executors.newFixedThreadPool(NUM_OF_THREADS+20);
+        ExecutorService executorService = Executors.newFixedThreadPool(NUM_OF_THREADS+ADDITIONAL_THREAD_POOL_SIZE);
         for(int i = 0; i <NUM_OF_THREADS; i++) {
 
             executorService.submit(decorateRunnable(runnable));
         }
         return executorService;
     }
+
 }

@@ -19,14 +19,14 @@ public class ReentrantLockCheck {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReentrantLockCheck.class);
 
-    public static final int SLEEP_TIME = 20000; //2000; //30000 for interruptibitility check
-
-    private ReentrantLock lock;
+    public final long SLEEP_TIME;
     private final int NUMBER_OF_THREADS;
 
+    private ReentrantLock lock;
 
-    public ReentrantLockCheck(int numOfThreads, boolean fair) {
+    public ReentrantLockCheck(int numOfThreads, long sleepTime, boolean fair) {
         NUMBER_OF_THREADS = numOfThreads;
+        SLEEP_TIME = sleepTime;
         lock = new ReentrantLock(fair);
     }
 
@@ -36,18 +36,18 @@ public class ReentrantLockCheck {
             //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
             doSomethingImportant();
         } catch (InterruptedException e) {
-            LOGGER.error("{}",e);
+            LOGGER.error("Exception: ",e);
         } finally {
             LOGGER.debug("Lock unlocked");
             lock.unlock();
         }
     }
 
-    public void doSomethingOnSharedResourceUsingReentrantLockAndUnlockSomwhere() {
+    public void doSomethingOnSharedResourceUsingReentrantLockAndUnlockElsewhere() {
         lock.lock();
         try {
             //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
-            doSomethingImportant();
+            doSomethingImportantAndUnlock();
         } catch (InterruptedException e) {
             LOGGER.error("{}",e);
         }
@@ -133,21 +133,24 @@ public class ReentrantLockCheck {
             try {
                 doSomethingImportant();
             } catch (InterruptedException e) {
-                LOGGER.error("{}", e);
+                LOGGER.error("Exception: ", e);
             }
         }
     }
 
     private void doSomethingImportant() throws InterruptedException {
-        try {
             LOGGER.debug("<<<<<< Thread {} is working on shared resource.", Thread.currentThread().getName());
             Thread.sleep(SLEEP_TIME);
             LOGGER.debug(">>>>>> Thread {} completed its work", Thread.currentThread().getName());
+    }
+
+    private void doSomethingImportantAndUnlock() throws InterruptedException {
+        try {
+           doSomethingImportant();
         }
         finally {
-//            LOGGER.debug("Lock unlocked");
-//            lock.unlock();
-//            countDownLatch.countDown();
+            LOGGER.debug("Lock unlocked");
+            lock.unlock();
         }
     }
 
