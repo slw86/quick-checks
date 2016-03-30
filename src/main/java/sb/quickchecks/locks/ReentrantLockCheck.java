@@ -17,13 +17,18 @@ import java.util.function.Consumer;
  */
 public class ReentrantLockCheck {
 
-    public static final int SLEEP_TIME = 2000; //2000; //30000 for interruptibitility check
-    //    private ReentrantLock lock = new ReentrantLock();
-    private ReentrantLock lock = new ReentrantLock(true);
     private static final Logger LOGGER = LoggerFactory.getLogger(ReentrantLockCheck.class);
-    private static final int NUM_OF_THREADS = 10; //2; //2 - for fainrness/non fairness
-    private CountDownLatch latch = new CountDownLatch(NUM_OF_THREADS);
-    private RandomQuoteRetriever randomQuoteRetriever = new RandomQuoteRetriever(latch);
+
+    public static final int SLEEP_TIME = 20000; //2000; //30000 for interruptibitility check
+
+    private ReentrantLock lock;
+    private final int NUMBER_OF_THREADS;
+
+
+    public ReentrantLockCheck(int numOfThreads, boolean fair) {
+        NUMBER_OF_THREADS = numOfThreads;
+        lock = new ReentrantLock(fair);
+    }
 
     public void doSomethingOnSharedResourceUsingReentrantLock() {
         lock.lock();
@@ -73,7 +78,7 @@ public class ReentrantLockCheck {
             //LOGGER.debug("Number of threads waiting: {}",lock.getQueueLength());
             doSomethingImportant();
             Random rand = new Random();
-            if(rand.nextInt(NUM_OF_THREADS) == 3) {
+            if(rand.nextInt(NUMBER_OF_THREADS) == 3) {
                 LOGGER.debug("Throwning exception");
                 throw new RuntimeException("Something is broken... said "+Thread.currentThread().getName());
             }
@@ -147,131 +152,7 @@ public class ReentrantLockCheck {
     }
 
 
-    public static void main(String[] args) throws InterruptedException {
 
-
-
-        ReentrantLockCheck reentrantLockCheck = new ReentrantLockCheck();
-
-            ExecutorService executorService = getExecutorServiceAndSubmitTasks(reentrantLockCheck);
-
-//            feedByThreads(reentrantLockCheck, executorService);
-
-            executorService.shutdown();
-
-            reentrantLockCheck.randomQuoteRetriever.printStatistics();
-
-
-
-
-
-        //interruptible:
-/*
-//        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingIntrinsicLock(), reentrantLockCheck);
-//        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingReentrantLock(), reentrantLockCheck);
-        Runnable runnable = getRunnable((r) -> r.doSomethingOnSharedResourceUsingReentrantInterruptibleLock(), reentrantLockCheck);
-
-        Thread t1 = new Thread(runnable);
-        Thread t2 = new Thread(runnable);
-        Thread t3 = new Thread(runnable);
-
-        t1.start();
-        t2.start();
-        t3.start();
-
-        Thread.sleep(2000);
-
-        LOGGER.debug("T1 state: {}", t1.getState().name());
-        LOGGER.debug("T2 state: {}", t2.getState().name());
-        LOGGER.debug("T3 state: {}", t3.getState().name());
-
-        //for intrinsic
-//        if(t1.getState() == Thread.State.BLOCKED) {
-//            t1.interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        } else if(t2.getState() == Thread.State.BLOCKED) {
-//            t2.interrupt();
-//            LOGGER.debug("INterrupted t2");
-//        }
-
-        //for reentrant
-        if(t1.getState() == Thread.State.WAITING) {
-            t1.interrupt();
-            LOGGER.debug("INterrupted t1");
-        } else if(t2.getState() == Thread.State.WAITING) {
-            t2.interrupt();
-            LOGGER.debug("INterrupted t1");
-        }
-
-        //for reentrant
-//        if(t1.getState() == Thread.State.TIMED_WAITING) {
-//            t1.interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        } else if(t2.getState() == Thread.State.TIMED_WAITING) {
-//            t2.interrupt();
-//            LOGGER.debug("INterrupted t1");
-//        }
-*/
-    }
-
-    private static void feedByThreads(ReentrantLockCheck reentrantLockCheck, ExecutorService executorService) throws InterruptedException {
-        Thread.sleep(SLEEP_TIME+10);
-
-        for(int i = 0; i < 20; i++) {
-            executorService.submit(decorateRunnable(() -> reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock()));
-            Thread.sleep(2);
-        }
-    }
-
-    private static Runnable decorateRunnable(Runnable runnable) {
-        return () -> {
-            LOGGER.debug("Thread {} attempting to do something on shared resource",Thread.currentThread().getName());
-            try {
-                runnable.run();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-//            LOGGER.debug("Thread {} completed its action", Thread.currentThread().getName());
-        };
-    }
-
-
-    private static ExecutorService getExecutorServiceAndSubmitTasks(final ReentrantLockCheck reentrantLockCheck) {
-        ExecutorService executorService = Executors.newFixedThreadPool(NUM_OF_THREADS+20);
-        for(int i = 0; i <NUM_OF_THREADS; i++) {
-
-            executorService.submit(decorateRunnable(() ->
-                    {
-                        while (!reentrantLockCheck.tryToDoSomethingOnSharedResourceUsingReentrantLock(reentrantLockCheck.latch)) {
-//                            LOGGER.debug("Thread {} is waiting for resource. Let's do something useful...", Thread.currentThread().getName());
-                           reentrantLockCheck.randomQuoteRetriever.printRandomQuote();
-                        }
-                    }
-//                    {
-//                        try {
-//                            while (!reentrantLockCheck.tryToDoSomethingOnSharedResourceUsingTimedReentrantLock(reentrantLockCheck.latch)) {
-//                                reentrantLockCheck.randomQuoteRetriever.printRandomQuote();
-//                            }
-//                        } catch (InterruptedException e) {
-//                            LOGGER.error("{}",e);
-//                        }
-//                    }
-//                    {
-//                        reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLock();
-//                    }
-//            {
-//                reentrantLockCheck.doSomethingOnSharedResourceUsingIntrinsicLock();
-//            }
-//            {
-//                reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockWithoutFinally();
-//            }
-//            {
-//                reentrantLockCheck.doSomethingOnSharedResourceUsingReentrantLockAndUnlockSomwhere();
-//            }
-                    ));
-        }
-        return executorService;
-    }
 
 
 
