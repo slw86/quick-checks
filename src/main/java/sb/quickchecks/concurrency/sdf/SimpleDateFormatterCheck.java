@@ -4,10 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
@@ -22,36 +19,38 @@ public class SimpleDateFormatterCheck {
     public static final String PATTERN = "dd-MM-YYYY hh:mm:ss";
 
 
-
     public static void main(String[] args) {
-
-        ExecutorService executorService = Executors.newFixedThreadPool(THREADS_NUMBER);
 
 
         Map<String, Date> stringDateMap = getMapFilledWithRandomDates(RANGE);
 
-        runMultithreadedFormatting(executorService, stringDateMap);
+        runConcurrentFormatting(stringDateMap, THREADS_NUMBER);
 
-
-        executorService.shutdown();
 
     }
 
-    private static void runMultithreadedFormatting(ExecutorService executorService, Map<String, Date> stringDateMap) {
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat(PATTERN);
+    static void runConcurrentFormatting(Map<String, Date> stringDateMap, int threadsNumber) {
+
+        ExecutorService executorService = Executors.newFixedThreadPool(threadsNumber);
 
         stringDateMap.forEach(
                 (s, date) -> executorService.submit(
                         () -> {
 
-                            String formatted = simpleDateFormat.format(date);
+                            String formatted = LegacyUtilClassWithManyResponsibilities.validateDateAndDoSomethingElse(date);
 
-                            if(!formatted.equals(s)) {
-                                LOGGER.error("Preformatted date: {} Formatted: {}  Date: {}", s, formatted, date);
+                            if (!formatted.equals(s)) {
+                                LOGGER.error("java.util.Date instance: {}\n" +
+                                                "Date formatted in single thread: {}\n" +
+                                                "Date formatted concurrently: {}",
+                                        date, s, formatted);
                             }
                         })
         );
+
+        executorService.shutdown();
     }
+
 
     static Map<String, Date> getMapFilledWithRandomDates(int range) {
 
@@ -67,11 +66,41 @@ public class SimpleDateFormatterCheck {
                 }
         );
 
-
         return dates;
     }
 
     static Date getRandomDate(Random rand) {
         return new Date(rand.nextInt(199), rand.nextInt(12), rand.nextInt(31), rand.nextInt(12), rand.nextInt(60), rand.nextInt(60));
     }
+}
+
+class LegacyUtilClassWithManyResponsibilities {
+
+    /*
+     * a lot of methods
+     */
+
+    private static SimpleDateFormat dateFormat;
+
+    static {
+        dateFormat = new SimpleDateFormat("dd-MM-YYYY hh:mm:ss");
+    }
+
+    /*
+     * methods...
+     */
+
+    public static String validateDateAndDoSomethingElse(Date dateOfSomething) {
+
+        // validate date
+
+        // do some additional magic
+
+        // finally - format date... maybe for GUI?
+        return dateFormat.format(dateOfSomething);
+    }
+
+    /*
+     * methods again...
+     */
 }
