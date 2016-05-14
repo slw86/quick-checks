@@ -73,7 +73,7 @@ public class ConcurrentUnmarshallCheck {
 
         xmlMessages.stream().forEach(message ->
                 executorService.submit(() -> {
-                            BusinessEntity entity = LegacyMessageUtil.convert(message);
+                            BusinessEntity entity = LegacyMessageService.convert(message);
                             System.out.println(entity);
                         }
                 )
