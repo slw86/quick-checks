@@ -7,8 +7,12 @@ import java.io.Serializable;
  */
 public class Entity implements Serializable {
 
+    private static final long serialVersionUID = -600452755178723601L;
     private String name;
     private String data;
+    private long ID;
+
+
 
     public String getName() {
         return name;
@@ -26,4 +30,11 @@ public class Entity implements Serializable {
         this.data = data;
     }
 
+    public long getID() {
+        return ID;
+    }
+
+    public void setID(long ID) {
+        this.ID = ID;
+    }
 }
