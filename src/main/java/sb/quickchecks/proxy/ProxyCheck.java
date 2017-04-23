@@ -68,5 +68,7 @@ public class ProxyCheck {
 
     static void doIt() {
 	System.out.println("do It");
+
+	System.out.println("do it again");
     }
 }
