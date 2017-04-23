@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 package sb.quickchecks.proxy;
-
+//test
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -20,7 +20,7 @@ public class ProxyCheck {
     }
     
     private static class ProxyCheckHandler implements InvocationHandler {
-        
+      int a; //test  
         private SampleInterface original;
 
         public ProxyCheckHandler(SampleInterface original) {
