@@ -62,5 +62,13 @@ public class ProxyCheck {
         proxy.doSmth();
         
         sampleInterfaceWithoutProxy.doSmth();
+
+	System.out.println();
+
+	System.out.println();
+
+	int x = 0;
+
+	double z = 9.0;
     }
 }
