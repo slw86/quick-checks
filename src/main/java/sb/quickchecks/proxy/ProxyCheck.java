@@ -66,5 +66,7 @@ public class ProxyCheck {
 	System.out.println();
 
 	System.out.println();
+
+	int x = 0;
     }
 }
